@@ -32,17 +32,28 @@
 
 #include <unistd.h>
 
+#include <sys/epoll.h>
 #include <sys/select.h>
+#include <sys/sendfile.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 
+#include <fcntl.h>
 #include <getopt.h>
 #include <netdb.h>
+
 #include <arpa/inet.h>
+
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 
 #if !defined(TRUE) || !defined(FALSE)
 enum { FALSE = 0, TRUE = !FALSE };
+#endif
+
+#ifndef DEFAULT_HOSTNAME
+#define DEFAULT_HOSTNAME "localhost"
 #endif
 
 #ifndef DEFAULT_PORT
@@ -51,19 +62,22 @@ enum { FALSE = 0, TRUE = !FALSE };
 
 int main(int argc, char *argv[])
 {
+    int verbose = FALSE;
+    const char* hostname = DEFAULT_HOSTNAME;
     const char* port = DEFAULT_PORT;
 
     static struct option long_options[] = {
         { "help", no_argument, 0, 'h' },
         { "version", no_argument, 0, 0 },
         { "verbose", no_argument, 0, 'v' },
+        { "hostname", required_argument, 0, 'H' },
         { "port", required_argument, 0, 'p' },
         { 0, 0, 0, 0 }
     };
 
     while (TRUE) {
         int option_index = 0;
-        int c = getopt_long(argc, argv, "hvp:", long_options, &option_index);
+        int c = getopt_long(argc, argv, "hvH:p:", long_options, &option_index);
 
         if (c == -1) {
             break;
@@ -82,6 +96,10 @@ int main(int argc, char *argv[])
                 port = optarg;
             } break;
 
+            case 'H': {
+                hostname = optarg;
+            } break;
+
             case 'h': {
                 /** @todo Create help menu */
                 printf("Help Menu\n");
@@ -90,6 +108,7 @@ int main(int argc, char *argv[])
 
             case 'v': {
                 printf("[Info] %s\n", "Verbose output enabled.");
+                verbose = TRUE;
             } break;
 
             case '?': {
@@ -102,7 +121,10 @@ int main(int argc, char *argv[])
         }
     }
 
-    printf("Configured server port: %s\n", port);
+    if (verbose) {
+        printf("Configured hostname: %s\n", hostname);
+        printf("Configured server port: %s\n", port);
+    }
     
     printf("%s\n", "serverd starting...");
 
@@ -184,29 +206,19 @@ int main(int argc, char *argv[])
                         continue;
                     }
 
+                    int optval = TRUE;
+                    setsockopt(i, IPPROTO_TCP, TCP_CORK, &optval, sizeof (optval));
+
                     const char* response =
                         "HTTP/1.1 200 OK\r\n"
                         "Connection: Close\r\n"
                         "Content-Type: text/html\r\n"
-                        "\r\n"
-                        "<!DOCTYPE html>\n"
-                        "<html lang='en-US'>\n"
-                        "<head>\n"
-                        "    <meta charset='UTF-8'>\n"
-                        "    <meta name='viewport' content='width=device-width, initial-scale=1.0, shrink-to-fit=no'>\n"
-                        "\n"
-                        "    <title>serverd</title>\n"
-                        "\n"
-                        "    <!-- Stylesheets -->\n"
-                        "</head>\n"
-                        "<body>\n"
-                        "    <main role='main'>\n"
-                        "        <p>serverd home</p>\n"
-                        "    </main>\n"
-                        "</body>\n"
-                        "</html>\n";
+                        "\r\n";
                     
-                    ssize_t bytes_sent = send(i, response, strlen(response), 0);
+                    send(i, response, strlen(response), 0);
+                    int f = open("samples/site/index.html", O_RDONLY | O_NONBLOCK);
+                    sendfile(i, f, NULL, 311);
+                    close(f);
 
                     FD_CLR(i, &main);
                     close(i);
