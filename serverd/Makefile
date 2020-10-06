@@ -1,19 +1,19 @@
 
 vpath %.c src
 
-RM := rm -f
-RMDIR := rm -rf
+RM       := rm -f
+RMDIR    := rm -rf
 
-CC := gcc
-CFLAGS := -std=c17 -Wall -Wextra -Wpedantic -Og -ggdb
+CC       := gcc
+CFLAGS   := -std=c17 -Wall -Wextra -Wpedantic -Og -ggdb
 CPPFLAGS := -D_GNU_SOURCE -D_FORTIFY_SOURCE=2
-LDFLAGS := -Wl,-O1,--sort-common,--as-needed,-z,relro,-z,now
-LIBS :=
+LDFLAGS  := -Wl,-O1,--sort-common,--as-needed,-z,relro,-z,now
+LIBS     := 
 
-SRCS := $(notdir $(wildcard src/*.c))
-OBJS := $(patsubst %.c,%.o,$(SRCS))
+SRCS     := $(notdir $(wildcard src/*.c))
+OBJS     := $(patsubst %.c,%.o,$(SRCS))
 
-TARGET := serverd
+TARGET   := serverd
 
 all: $(TARGET)
 
