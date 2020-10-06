@@ -2,19 +2,22 @@
  * serverd - Modern web server daemon
  * Copyright (C) 2020 Jose Fernando Lopez Fernandez
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * This program is free software; you can redistribute it
+ * and/or modify it under the terms of the GNU General
+ * Public License as published by the Free Software
+ * Foundation; either version 2 of the License, or (at your
+ * option) any later version.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * This program is distributed in the hope that it will be
+ * useful, but WITHOUT ANY WARRANTY; without even the
+ * implied warranty of MERCHANTABILITY or FITNESS FOR A
+ * PARTICULAR PURPOSE.  See the GNU General Public License
+ * for more details.
  *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ * You should have received a copy of the GNU General Public
+ * License along with this program; if not, write to the
+ * Free Software Foundation, Inc., 51 Franklin Street, Fifth
+ * Floor, Boston, MA 02110-1301 USA.
  *
  */
 
@@ -29,17 +32,78 @@
 
 #include <unistd.h>
 
-#include <netdb.h>
-
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 
+#include <getopt.h>
+#include <netdb.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
-int main(void)
+#if !defined(TRUE) || !defined(FALSE)
+enum { FALSE = 0, TRUE = !FALSE };
+#endif
+
+#ifndef DEFAULT_PORT
+#define DEFAULT_PORT "8080"
+#endif
+
+int main(int argc, char *argv[])
 {
+    const char* port = DEFAULT_PORT;
+
+    static struct option long_options[] = {
+        { "help", no_argument, 0, 'h' },
+        { "version", no_argument, 0, 0 },
+        { "verbose", no_argument, 0, 'v' },
+        { "port", required_argument, 0, 'p' },
+        { 0, 0, 0, 0 }
+    };
+
+    while (TRUE) {
+        int option_index = 0;
+        int c = getopt_long(argc, argv, "hvp:", long_options, &option_index);
+
+        if (c == -1) {
+            break;
+        }
+
+        switch (c) {
+            case 0: {
+                if (strcmp(long_options[option_index].name, "version") == 0) {
+                    /** @todo Configure project versioning info */
+                    printf("Version Info\n");
+                    return EXIT_SUCCESS;
+                }
+            } break;
+
+            case 'p': {
+                port = optarg;
+            } break;
+
+            case 'h': {
+                /** @todo Create help menu */
+                printf("Help Menu\n");
+                return EXIT_SUCCESS;
+            } break;
+
+            case 'v': {
+                printf("[Info] %s\n", "Verbose output enabled.");
+            } break;
+
+            case '?': {
+                break;
+            } break;
+
+            default: {
+                printf("?? getopt returned character code 0%o ?? \n", c);
+            } break;
+        }
+    }
+
+    printf("Configured server port: %s\n", port);
+    
     printf("%s\n", "serverd starting...");
 
     struct addrinfo hints;
@@ -49,7 +113,7 @@ int main(void)
     hints.ai_flags = AI_PASSIVE;
 
     struct addrinfo* bind_address;
-    getaddrinfo(0, "8080", &hints, &bind_address);
+    getaddrinfo(0, port, &hints, &bind_address);
     
     int socket_listen = socket(bind_address->ai_family, bind_address->ai_socktype, bind_address->ai_protocol);
 
@@ -77,7 +141,7 @@ int main(void)
     FD_SET(socket_listen, &main);
     int max_socket = socket_listen;
 
-    while (1) {
+    while (TRUE) {
         fd_set reads = main;
 
         if (select(max_socket + 1, &reads, NULL, NULL, NULL) == -1) {
