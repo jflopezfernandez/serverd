@@ -51,3 +51,8 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# Ignore Doxygen-generated Docs
+serverd/docs/html
+serverd/docs/latex
+
