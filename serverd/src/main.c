@@ -49,35 +49,101 @@
 #include <netinet/tcp.h>
 
 #if !defined(TRUE) || !defined(FALSE)
+/**
+ * @brief Definitions for true and false
+ *
+ * @details This enum contains definitions for the boolean
+ * values TRUE and FALSE, which represent 1 and 0,
+ * respectively.
+ * 
+ */
 enum { FALSE = 0, TRUE = !FALSE };
 #endif
 
+/**
+ * @def EPOLL_MAX_EVENTS
+ * @brief Maximum events returned per call to epoll_wait(2).
+ * 
+ */
 #ifndef EPOLL_MAX_EVENTS
 #define EPOLL_MAX_EVENTS (10)
 #endif
 
+/**
+ * @def DEFAULT_HOSTNAME
+ * @brief The server's default hostname.
+ * 
+ */
 #ifndef DEFAULT_HOSTNAME
 #define DEFAULT_HOSTNAME "localhost"
 #endif
 
+/**
+ * @def DEFAULT_PORT
+ * @brief The default port the server should listen on.
+ *
+ * @details Superuser privileges are required in order for
+ * any application to bind to a port with a number in the
+ * range 1-1024. Common port numbers for development or
+ * testing web servers to use are 3000 and 8080. If started
+ * on port 80, the server will respond to and service client
+ * requests like any normal server would, although it is
+ * also possible to use a reverse proxy for TLS termination
+ * while native serverd TLS support is implemented.
+ *
+ * @author Jose Fernando Lopez Fernandez
+ * @date October 7, 2020 [08:13:05 AM EDT]
+ * 
+ */
 #ifndef DEFAULT_PORT
 #define DEFAULT_PORT "8080"
 #endif
 
+/**
+ * Program Options
+ *
+ * @details This array contains the list of valid long
+ * options recognized by the server, as well as whether each
+ * option accepts (or sometimes even requires) an additional
+ * value when specified. If the third argument is NULL, the
+ * call to getopt_long returns the fourth argument.
+ * Otherwise, the call to getopt_long will return the value
+ * specified by that fourth argument.
+ * 
+ */
+static struct option long_options[] = {
+    { "help",     no_argument,       0, 'h' },
+    { "version",  no_argument,       0,  0  },
+    { "hostname", required_argument, 0, 'H' },
+    { "port",     required_argument, 0, 'p' },
+    { 0, 0, 0, 0 }
+};
+
+/**
+ * This is the entry point of the server.
+ * 
+ * @param argc 
+ * @param argv
+ *
+ * @return int 
+ */
 int main(int argc, char *argv[])
 {
-    int verbose = FALSE;
+    /**
+     * @brief The hostname the server will use.
+     *
+     * @todo The user should be able to configure the
+     * hostname for the server on a per-virtual host basis.
+     * 
+     */
     const char* hostname = DEFAULT_HOSTNAME;
-    const char* port = DEFAULT_PORT;
 
-    static struct option long_options[] = {
-        { "help", no_argument, 0, 'h' },
-        { "version", no_argument, 0, 0 },
-        { "verbose", no_argument, 0, 'v' },
-        { "hostname", required_argument, 0, 'H' },
-        { "port", required_argument, 0, 'p' },
-        { 0, 0, 0, 0 }
-    };
+    /**
+     * @brief The port the server will use to listen for incoming
+     * client connections on.
+     * 
+     */
+    const char* port = DEFAULT_PORT;
 
     while (TRUE) {
         int option_index = 0;
@@ -110,11 +176,6 @@ int main(int argc, char *argv[])
                 return EXIT_SUCCESS;
             } break;
 
-            case 'v': {
-                printf("[Info] %s\n", "Verbose output enabled.");
-                verbose = TRUE;
-            } break;
-
             case '?': {
                 break;
             } break;
@@ -125,10 +186,8 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (verbose) {
-        printf("Configured hostname: %s\n", hostname);
-        printf("Configured server port: %s\n", port);
-    }
+    printf("Configured hostname: %s\n", hostname);
+    printf("Configured server port: %s\n", port);
     
     printf("%s\n", "serverd starting...");
 
@@ -139,7 +198,7 @@ int main(int argc, char *argv[])
     hints.ai_flags = AI_PASSIVE;
 
     struct addrinfo* bind_address;
-    getaddrinfo(0, port, &hints, &bind_address);
+    getaddrinfo(NULL, port, &hints, &bind_address);
     
     int socket_listen = socket(bind_address->ai_family, bind_address->ai_socktype, bind_address->ai_protocol);
 
@@ -210,12 +269,18 @@ int main(int argc, char *argv[])
                 }
 
                 char address_buffer[128];
-                getnameinfo((struct sockaddr *) &client_address, client_len, address_buffer, sizeof (address_buffer), 0, 0, NI_NUMERICHOST);
+                getnameinfo((struct sockaddr *) &client_address, client_len, address_buffer, sizeof (address_buffer), NULL, 0, NI_NUMERICHOST);
                 printf("New connection from %s\n", address_buffer);
             } else {
                 if (events[i].events & EPOLLIN) {
-                    char request[1024];
+                    
+                    /** Allocate a stack buffer for the request data */
+                    char request[1024] = { 0 };
+
+                    /** Read the client request into the buffer */
                     read(events[i].data.fd, request, 1024);
+
+                    /** Log the buffer to stdout for now */
                     printf("%s\n", request);
 
                     const char* response =
