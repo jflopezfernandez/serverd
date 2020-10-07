@@ -48,6 +48,8 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
+#include "memory.h"
+
 #if !defined(TRUE) || !defined(FALSE)
 /**
  * @brief Definitions for true and false
