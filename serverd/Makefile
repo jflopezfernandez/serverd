@@ -5,7 +5,7 @@ RM       := rm -f
 RMDIR    := rm -rf
 
 CC       := gcc
-CFLAGS   := -std=c17 -Wall -Wextra -Wpedantic -Og -ggdb
+CFLAGS   := -std=c17 -Wall -Wextra -Wpedantic -Og -ggdb -g3
 CPPFLAGS := -D_GNU_SOURCE -D_FORTIFY_SOURCE=2
 LDFLAGS  := -Wl,-O1,--sort-common,--as-needed,-z,relro,-z,now
 LIBS     := 
