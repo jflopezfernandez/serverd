@@ -120,6 +120,34 @@ static struct option long_options[] = {
 };
 
 /**
+ * Program Help Menu
+ *
+ * @details This is the menu display to the user when the -h
+ * or --help command-line arguments are passed in. The
+ * option list is current as of October 7, 2020 [11:13 AM EDT],
+ * but the project version information still needs to be
+ * sorted out.
+ *
+ * @author Jose Fernando Lopez Fernandez
+ * @date October 7, 2020 [11:13:52 AM EDT]
+ *
+ * @todo Establish project versioning system
+ *
+ */
+static const char* help_menu = 
+    "serverd version: 0.0.1\n"
+    "Usage: serverd [options]\n"
+    "\n"
+    "Configuration Options:\n"
+    "  -H, --hostname <str>     Server hostname\n"
+    "  -p, --port <int>         Port number to bind to\n"
+    "\n"
+    "Generic Options:\n"
+    "  -h, --help               Display this help menu and exit\n"
+    "      --version            Display server version information\n"
+    "\n";
+
+/**
  * This is the entry point of the server.
  * 
  * @param argc 
@@ -145,11 +173,67 @@ int main(int argc, char *argv[])
      */
     const char* port = DEFAULT_PORT;
 
+    /**
+     * Enter command-line argument processing loop.
+     *
+     * The option string dictates what short options are
+     * valid when starting the server with command-line
+     * arguments. Some of these short options interact with
+     * the long options array defined above.
+     *
+     * An option that must be specified with an argument has
+     * a colon after its letter. If the argument for a
+     * particular option is optional, that option's letter
+     * will be followed by two colons.
+     *
+     */
     while (TRUE) {
+
+        /**
+         * @details This variable is set by getopt_long(3)
+         * on each iteration of the option-parsing loop. It
+         * is used as the index to the long options array
+         * when a long option is detected in the input.
+         *
+         */
         int option_index = 0;
+
+        /**
+         * Option Char
+         *
+         * @details Each call to getopt_long(3) returns a
+         * sentinel character that either uniquely identifies
+         * a command-line option or can be used to do so in
+         * the case where the return value is zero (0).
+         *
+         * This latter case is useful because it allows for
+         * the use of both long and short option forms, both
+         * of which this server uses.
+         *
+         */
         int c = getopt_long(argc, argv, "hvH:p:", long_options, &option_index);
 
+        /**
+         * When getopt(3), et. al, are done parsing all of
+         * the passed-in command-line arguments, they return
+         * a value of -1. We can therefore simply and safely
+         * break out of this loop if we detect this here.
+         *
+         */
         if (c == -1) {
+            /**
+             * Any additional command-line arguments that
+             * were not deemed to be valid command-line
+             * options are considered to be positional
+             * arguments, and they can be iterated over
+             * using the optind variable provided by the
+             * getopt*(3) function(s).
+             *
+             * All of these positional arguments, if they
+             * exist, will be located at argv[optind] until
+             * argv[argc - 1].
+             *
+             */
             break;
         }
 
@@ -160,26 +244,38 @@ int main(int argc, char *argv[])
                     printf("Version Info\n");
                     return EXIT_SUCCESS;
                 }
+
+                /** @todo What happens if we've gotten to this point? */
             } break;
 
-            case 'p': {
-                port = optarg;
-            } break;
-
+            /**
+             * Configure Server Hostname
+             */
             case 'H': {
                 hostname = optarg;
             } break;
 
+            /**
+             * Display Help Menu
+             */
             case 'h': {
-                /** @todo Create help menu */
-                printf("Help Menu\n");
+                printf("%s", help_menu);
                 return EXIT_SUCCESS;
             } break;
 
+            /**
+             * Configure Server Port
+             */
+            case 'p': {
+                port = optarg;
+            } break;
+
+            /** @todo What conditions cause this case, and how likely are they? */
             case '?': {
                 break;
             } break;
 
+            /** @todo What conditions trigger this case, and how likely are they? */
             default: {
                 printf("?? getopt returned character code 0%o ?? \n", c);
             } break;
