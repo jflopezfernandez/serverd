@@ -180,14 +180,7 @@ int main(int argc, char *argv[])
 
     struct epoll_event events[EPOLL_MAX_EVENTS];
 
-    // fd_set main;
-    // FD_ZERO(&main);
-    // FD_SET(socket_listen, &main);
-    // int max_socket = socket_listen;
-
     while (TRUE) {
-
-        //
         int nfds = epoll_wait(epfd, events, EPOLL_MAX_EVENTS, -1);
 
         if (nfds == -1) {
@@ -195,12 +188,12 @@ int main(int argc, char *argv[])
             return EXIT_FAILURE;
         }
 
-        for (int i = 0; i < nfds; ++n) {
+        for (int i = 0; i < nfds; ++i) {
             if (events[i].data.fd == socket_listen) {
                 struct sockaddr_storage client_address;
                 socklen_t client_len = sizeof (client_address);
 
-                int new_connection_socket = accept(socket_listen, (struct sockaddr *) &client_address, client_len);
+                int new_connection_socket = accept(socket_listen, (struct sockaddr *) &client_address, &client_len);
 
                 if (new_connection_socket == -1) {
                     fprintf(stderr, "[Error] %s\n", strerror(errno));
@@ -208,79 +201,41 @@ int main(int argc, char *argv[])
                 }
 
                 // setnonblocking(conn_sock)
-                ev.events = EPOLLIN | EPOLLET;
+                ev.events = EPOLLIN | EPOLLET | EPOLLRDHUP | EPOLLOUT | EPOLLERR;
                 ev.data.fd = new_connection_socket;
 
                 if (epoll_ctl(epfd, EPOLL_CTL_ADD, new_connection_socket, &ev) == -1) {
                     fprintf(stderr, "[Error] %s\n", strerror(errno));
                     return EXIT_FAILURE;
                 }
+
+                char address_buffer[128];
+                getnameinfo((struct sockaddr *) &client_address, client_len, address_buffer, sizeof (address_buffer), 0, 0, NI_NUMERICHOST);
+                printf("New connection from %s\n", address_buffer);
             } else {
-                // Use fd
+                if (events[i].events & EPOLLIN) {
+                    char request[1024];
+                    read(events[i].data.fd, request, 1024);
+                    printf("%s\n", request);
+
+                    const char* response =
+                        "HTTP/1.1 200 OK\r\n"
+                        "Connection: Close\r\n"
+                        "Content-Type: text/html\r\n"
+                        "\r\n";
+
+                    send(events[i].data.fd, response, strlen(response), 0);
+                    int f = open("samples/site/index.html", O_RDONLY | O_NONBLOCK);
+                    sendfile(events[i].data.fd, f, NULL, 311);
+                    close(f);
+
+                    // DEBUG: close socket
+                    int current_socket = events[i].data.fd;
+                    epoll_ctl(epfd, EPOLL_CTL_DEL, events[i].data.fd, NULL);
+                    close(current_socket);
+                }
             }
         }
-        
-        // fd_set reads = main;
-
-        // if (select(max_socket + 1, &reads, NULL, NULL, NULL) == -1) {
-        //     /** @todo Improve error checking */
-        //     fprintf(stderr, "select() failed\n");
-        //     return EXIT_FAILURE;
-        // }
-
-        // for (int i = 1; i <= max_socket; ++i) {
-        //     if (FD_ISSET(i, &reads)) {
-        //         if (i == socket_listen) {
-        //             struct sockaddr_storage client_address;
-        //             socklen_t client_len = sizeof (client_address);
-
-        //             int socket_client = accept(socket_listen, (struct sockaddr *) &client_address, &client_len);
-
-        //             if (socket_client == -1) {
-        //                 fprintf(stderr, "[Error] %s\n", strerror(errno));
-        //                 return EXIT_FAILURE;
-        //             }
-
-        //             FD_SET(socket_client, &main);
-
-        //             if (socket_client > max_socket) {
-        //                 max_socket = socket_client;
-        //             }
-
-        //             char address_buffer[128];
-        //             getnameinfo((struct sockaddr *) &client_address, client_len, address_buffer, sizeof (address_buffer), 0, 0, NI_NUMERICHOST);
-        //             printf("New connection from %s\n", address_buffer);
-        //         } else {
-        //             char request[1024];
-        //             ssize_t bytes_received = recv(i, request, 1024, 0);
-
-        //             printf("%s\n", request);
-
-        //             if (bytes_received < 1) {
-        //                 FD_CLR(i, &main);
-        //                 close(i);
-        //                 continue;
-        //             }
-
-        //             int optval = TRUE;
-        //             setsockopt(i, IPPROTO_TCP, TCP_CORK, &optval, sizeof (optval));
-
-        //             const char* response =
-        //                 "HTTP/1.1 200 OK\r\n"
-        //                 "Connection: Close\r\n"
-        //                 "Content-Type: text/html\r\n"
-        //                 "\r\n";
-                    
-        //             send(i, response, strlen(response), 0);
-        //             int f = open("samples/site/index.html", O_RDONLY | O_NONBLOCK);
-        //             sendfile(i, f, NULL, 311);
-        //             close(f);
-
-        //             FD_CLR(i, &main);
-        //             close(i);
-        //         }
-        //     }
-        // }
     }
 
     close(socket_listen);
