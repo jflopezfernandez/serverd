@@ -55,4 +55,5 @@ dkms.conf
 # Ignore Doxygen-generated Docs
 serverd/docs/html
 serverd/docs/latex
+serverd/docs/man
 
