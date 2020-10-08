@@ -36,7 +36,30 @@
  *
  */
 #ifndef __linux__
-#error "This platform is not supported."
+    #error "This platform is not supported."
+#endif
+
+/**
+ * If a configuration constant represents a value that may
+ * be overriden at runtime by the user via the command-line
+ * or a configuration file, it should be defined in
+ * configuration.c. If it's simply a preprocessor macro that
+ * cannot (or should not) be configurable at run-time,
+ * usually because of the runtime performance penalty that
+ * would otherwise be incurred, it should be defined here.
+ *
+ */
+#ifndef CONFIGURATION_CONSTANTS
+#define CONFIGURATION_CONSTANTS
+#endif
+
+/**
+ * @def EPOLL_MAX_EVENTS
+ * @brief Maximum events returned per call to epoll_wait(2).
+ * 
+ */
+#ifndef EPOLL_MAX_EVENTS
+#define EPOLL_MAX_EVENTS (10)
 #endif
 
 #endif /** PROJECT_INCLUDES_CONFIG_H */
