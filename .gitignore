@@ -1,6 +1,12 @@
 # Prerequisites
 *.d
 
+# Preprocessed Output
+*.pp
+
+# Assembly Output
+*.s
+
 # Object files
 *.o
 *.ko
