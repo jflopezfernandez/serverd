@@ -33,15 +33,6 @@
 #include "error.h"
 
 /**
- * @def EPOLL_MAX_EVENTS
- * @brief Maximum events returned per call to epoll_wait(2).
- * 
- */
-#ifndef EPOLL_MAX_EVENTS
-#define EPOLL_MAX_EVENTS (10)
-#endif
-
-/**
  * @def DEFAULT_HOSTNAME
  * @brief The server's default hostname.
  * 
