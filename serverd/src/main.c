@@ -158,8 +158,9 @@ int main(int argc, char *argv[])
      */
     struct configuration_options_t* configuration_options = initialize_server_configuration(argc, argv);
 
-    printf("Configured hostname: %s\n", configuration_options->hostname);
-    printf("Configured server port: %s\n", configuration_options->port);
+    printf("Configuration filename: %s\n", configuration_options->configuration_filename);
+    printf("Hostname: %s\n", configuration_options->hostname);
+    printf("Sever port: %s\n", configuration_options->port);
 
     return EXIT_SUCCESS;
     

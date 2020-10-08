@@ -361,27 +361,193 @@ static void parse_configuration_file_options(struct configuration_options_t* con
         return;
     }
 
+    /**
+     * Open the configuration file.
+     *
+     */
     FILE* configuration_file = fopen(configuration_options->configuration_filename, "r");
 
+    /**
+     * Verify that we were actually able to open the
+     * configuration file.
+     *
+     * The call to fopen(3) could have failed for a number
+     * of reasons, including the file not existing, the path
+     * being incorrect, or the server not having the
+     * permission required to read the file.
+     *
+     */
     if (configuration_file == NULL) {
+        /**
+         * If we are not able to read the configuration file,
+         * this represents a fatal error. No further
+         * execution should be carried out.
+         *
+         */
         fatal_error("[Error] %s: %s (%s)\n", "Could not open configuration file", configuration_options->configuration_filename, strerror(errno));
     }
 
-    /** @todo Continue configuration file parsing */
-
+    /**
+     * Define the size of the line buffer to use while
+     * parsing the configuration file.
+     *
+     * Honestly, 512 bytes is ridiculously long for what we
+     * need, but it's the block size on solid-state drives,
+     * so it's probably the smallest we can make without
+     * impacting performance too much.
+     *
+     * @todo It may be well-worth our time to determine
+     * whether reading into a much larger input buffer is
+     * significantly faster.
+     *
+     */
     size_t buffer_size = 512;
+    
+    /**
+     * Heap-allocate the line buffer.
+     *
+     * The getline(3) function that we are using specifically
+     * requires that the line buffer argument to be
+     * heap-allocated.
+     *
+     */
     char* line_buffer = allocate_memory(sizeof(char) * buffer_size);
 
+    /**
+     * Iterate over the configuration file stream, reading
+     * each line into the line buffer.
+     *
+     */
     while ((getline(&line_buffer, &buffer_size, configuration_file)) > 0) {
-        printf("%s", line_buffer);
+        /**
+         * In other to use a more simplistic, hand-made
+         * configuration file parser instead of something
+         * more complicated, like PCRE, we use a basic state
+         * machine to eliminate all of the comments in the
+         * current line.
+         *
+         * Once we detect a comment, we begin to "zero out"
+         * the line content after that point. We're not
+         * actually zeroing anything out, though, we're
+         * simply replacing the character at each location
+         * after a comment is found with a space, which then
+         * strtok(3) skips over once we start tokenizing the
+         * input line.
+         *
+         */
+        int comment = FALSE;
+
+        /**
+         * Iterate over each character of the input line.
+         *
+         */
+        for (size_t i = 0; i < strlen(line_buffer); ++i) {
+            /**
+             * If we have already detected a comment on this
+             * line, replace the current character with a
+             * space.
+             *
+             */
+            if (comment) {
+                line_buffer[i] = ' ';
+            }
+
+            /**
+             * If we find a '#' symbol, interpret it as the
+             * start of a comment.
+             *
+             * @note Since we are explicitly setting comment
+             * to TRUE, rather than negating it (!comment),
+             * this has the effect of making the comment
+             * state-transition idempotent, so we don't have
+             * to worry about multiple pound signs per line
+             * switching us in and out of the comment mode.
+             *
+             */
+            if (line_buffer[i] == '#') {
+                comment = TRUE;
+            }
+        }
+
+        /**
+         * Tokenize the input line.
+         *
+         * Having cleared the input line of all comments, we
+         * can begin the tokenization process by splitting
+         * the input line based on equal signs, spaces, or
+         * new line characters.
+         *
+         * The configuration file parser expects configuration
+         * options to be defined as follows:
+         *
+         *  Option=Value
+         *
+         * The equivalent regular expression for parsing this
+         * grammar looks like this:
+         *
+         *  ^([A-Za-z]+)\s*=(.*)$
+         *
+         * While we are not actually using regular expressions
+         * at the moment, it may eventually become necessary,
+         * depending on the complexity of the configuration
+         * language we deem necessary.
+         *
+         */
+        char* option = strtok(line_buffer, " =#\r\n");
+
+        /**
+         * It's possible that there are blank lines in the
+         * configuration file, both before and after we've
+         * gone through and cleared all the comments, so
+         * if strtok(3) doesn't find anything on this line,
+         * just move on.
+         *
+         */
+        if ((option != NULL) && (strcmp(option, "") != 0)) {
+            /** Get value */
+            char* value = strtok(NULL, "\r\n");
+
+            /**
+             * Since we did find an option token on this
+             * line, a value token is necessary.
+             *
+             */
+            if ((value == NULL) || (strcmp(value,"") == 0)) {
+                /**
+                 * If no value is found for the current
+                 * configuration option, we need to exit
+                 * right away with an error message indicating
+                 * the problem.
+                 *
+                 */
+                fatal_error("[Error] Invalid configuration setting for option: %s\n", option);
+            }
+
+            char* value_string = allocate_memory(strlen(value));
+            strcpy(value_string, value);
+
+            /** @todo Validate configuration options */
+            if (strcmp(option, "hostname") == 0) {
+                configuration_options->hostname = value_string;
+            } else if (strcmp(option, "port") == 0) {
+                configuration_options->port = value_string;
+            } else {
+                free(value_string);
+                fatal_error("[Error] %s: %s\n", "Unrecognized option", option);
+            }
+        }
     }
 
-    // int current_character = 0;
+    /**
+     * Free the line buffer memory.
+     *
+     */
+    free(line_buffer);
 
-    // while ((current_character = fgetc(configuration_file)) != EOF) {
-    //     putchar(current_character);
-    // }
-
+    /**
+     * Close the configuration file stream.
+     *
+     */
     fclose(configuration_file);
 }
 

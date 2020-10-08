@@ -66,8 +66,8 @@ void safe_free(void** ptr);
  * the pointer to void**.
  *
  */
-#ifndef FREE
-#define FREE(ptr) ((void **) &ptr)
+#ifndef free
+#define free(ptr) safe_free((void **) &ptr)
 #endif
 
 #endif /** PROJECT_INCLUDES_MEMORY */
