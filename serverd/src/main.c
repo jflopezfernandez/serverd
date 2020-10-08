@@ -48,6 +48,7 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
+#include "config.h"
 #include "error.h"
 #include "memory.h"
 
@@ -445,21 +446,21 @@ int main(int argc, char *argv[])
 
                     if (request_method == NULL) {
                         /** @todo This error needs to actually be handled. */
-                        fatal_error(stderr, "[Error] %s\n", "Invalid request method.");
+                        fatal_error("[Error] %s\n", "Invalid request method.");
                     }
 
                     char* request_uri = strtok(NULL, " \r\n");
 
                     if (request_uri == NULL) {
                         /** @todo This also needs to actually be handled */
-                        fatal_error(stderr, "[Error] %s\n", "No request URI found.");
+                        fatal_error("[Error] %s\n", "No request URI found.");
                     }
 
                     char* request_version = strtok(NULL, " \r\n");
 
                     if (request_version == NULL) {
                         /** @todo Probably send an invalid request error */
-                        fatal_error(stderr, "[Error] %s\n", "Invalid request version.");
+                        fatal_error("[Error] %s\n", "Invalid request version.");
                     }
 
                     const char* response =
