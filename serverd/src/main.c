@@ -27,12 +27,14 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 #include <errno.h>
 #include <time.h>
 
 #include <unistd.h>
 
 #include <sys/epoll.h>
+#include <sys/resource.h>
 #include <sys/select.h>
 #include <sys/sendfile.h>
 #include <sys/socket.h>
@@ -42,6 +44,7 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <netdb.h>
+#include <syslog.h>
 
 #include <arpa/inet.h>
 
@@ -158,13 +161,56 @@ int main(int argc, char *argv[])
      */
     struct configuration_options_t* configuration_options = initialize_server_configuration(argc, argv);
 
-    printf("Configuration filename: %s\n", configuration_options->configuration_filename);
-    printf("Hostname: %s\n", configuration_options->hostname);
-    printf("Sever port: %s\n", configuration_options->port);
+    umask(0);
+    struct rlimit resource_limit;
+    getrlimit(RLIMIT_NOFILE, &resource_limit);
 
-    return EXIT_SUCCESS;
+    pid_t pid;
+
+    if ((pid = fork()) == -1) {
+        fatal_error("[Error] %s\n", strerror(errno));
+    } else if (pid != 0) {
+        return EXIT_SUCCESS;
+    }
+
+    setsid();
+
+    struct sigaction signal_action;
+    signal_action.sa_handler = SIG_IGN;
+    sigemptyset(&signal_action.sa_mask);
+    signal_action.sa_flags = 0;
+
+    if (sigaction(SIGHUP, &signal_action, NULL) == -1) {
+        fatal_error("[Error] %s\n", strerror(errno));
+    }
+
+    if ((pid = fork()) == -1) {
+        fatal_error("[Error] %s\n", strerror(errno));
+    } else if (pid != 0) {
+        return EXIT_SUCCESS;
+    }
+
+    printf("%u\n", getpid());
+
+    // if (chdir("/") == -1) {
+    //    fatal_error("[Error] %s\n", strerror(errno));
+    // }
+
+    if (resource_limit.rlim_max == RLIM_INFINITY) {
+        resource_limit.rlim_max = 1024;
+    }
+
+    for (rlim_t i = 0; i < resource_limit.rlim_max; ++i) {
+        close(i);
+    }
+
+    openlog("serverd", LOG_CONS, LOG_DAEMON);
+
+    // printf("Configuration filename: %s\n", configuration_options->configuration_filename);
+    // printf("Hostname: %s\n", configuration_options->hostname);
+    // printf("Sever port: %s\n", configuration_options->port);
     
-    printf("%s\n", "serverd starting...");
+    // printf("%s\n", "serverd starting...");
 
     socket_t socket_listen = initialize_listener_socket(configuration_options->hostname, configuration_options->port);
 
@@ -184,6 +230,8 @@ int main(int argc, char *argv[])
 
     struct epoll_event events[EPOLL_MAX_EVENTS];
 
+    syslog(LOG_NOTICE, "Listening for new connections on port %s...", configuration_options->port);
+
     while (TRUE) {
         int nfds = epoll_wait(epfd, events, EPOLL_MAX_EVENTS, -1);
 
@@ -199,8 +247,7 @@ int main(int argc, char *argv[])
                 int new_connection_socket = accept(socket_listen, (struct sockaddr *) &client_address, &client_len);
 
                 if (new_connection_socket == -1) {
-                    fprintf(stderr, "[Error] %s\n", strerror(errno));
-                    return EXIT_FAILURE;
+                    fatal_error("[Error] %s\n", strerror(errno));
                 }
 
                 // setnonblocking(conn_sock)
@@ -208,8 +255,7 @@ int main(int argc, char *argv[])
                 ev.data.fd = new_connection_socket;
 
                 if (epoll_ctl(epfd, EPOLL_CTL_ADD, new_connection_socket, &ev) == -1) {
-                    fprintf(stderr, "[Error] %s\n", strerror(errno));
-                    return EXIT_FAILURE;
+                    fatal_error("[Error] %s\n", strerror(errno));
                 }
 
                 char address_buffer[128];
@@ -217,11 +263,14 @@ int main(int argc, char *argv[])
 
                 if (get_name_info_error_code) {
                     /** @todo Implement more robust error-handling */
-                    fprintf(stderr, "[Error] %s\n", strerror(errno));
+                    fatal_error("[Error] %s\n", strerror(errno));
                 }
 
                 /** Log the client request to the console */
-                printf("New connection from %s\n", address_buffer);
+                //printf("New connection from %s\n", address_buffer);
+
+                /** Log the new connection request */
+                syslog(LOG_INFO, "New connection from %s...", address_buffer);
             } else {
                 if (events[i].events & EPOLLIN) {
                     
@@ -237,7 +286,7 @@ int main(int argc, char *argv[])
                     }
 
                     /** Log the buffer to stdout for now */
-                    printf("%s\n", request);
+                    //printf("%s\n", request);
 
                     /**
                      * Stack-allocate a buffer to preserve
@@ -291,8 +340,14 @@ int main(int argc, char *argv[])
                         "Connection: Close\r\n"
                         "Content-Type: text/html\r\n"
                         "\r\n";
+                    
+                    //char filename_buffer[1024] = { 0 };
+                    //snprintf(filename_buffer, 1024, "%s%s", configuration_options->document_root_directory, "index.html");
+                    //syslog(LOG_DEBUG, "Filename buffer: %s", filename_buffer);
+
 
                     send(events[i].data.fd, response, strlen(response), 0);
+                    //int f = open(filename_buffer, O_RDONLY | O_NONBLOCK);
                     int f = open("samples/site/index.html", O_RDONLY | O_NONBLOCK);
                     sendfile(events[i].data.fd, f, NULL, 311);
                     close(f);

@@ -88,10 +88,11 @@
  * 
  */
 static struct option long_options[] = {
-    { "help",     no_argument,       0, 'h' },
-    { "version",  no_argument,       0,  0  },
-    { "hostname", required_argument, 0, 'H' },
-    { "port",     required_argument, 0, 'p' },
+    { "help",                   no_argument,       0, 'h' },
+    { "version",                no_argument,       0,  0  },
+    { "configuration-filename", required_argument, 0, 'f' },
+    { "hostname",               required_argument, 0, 'H' },
+    { "port",                   required_argument, 0, 'p' },
     { 0, 0, 0, 0 }
 };
 
@@ -115,12 +116,13 @@ static const char* help_menu =
     "Usage: serverd [options]\n"
     "\n"
     "Configuration Options:\n"
-    "  -H, --hostname <str>     Server hostname\n"
-    "  -p, --port <int>         Port number to bind to\n"
+    "  -f, --configuration-filename <str>    Path to alternative configuration file\n"
+    "  -H, --hostname <str>                  Server hostname\n"
+    "  -p, --port <int>                      Port number to bind to\n"
     "\n"
     "Generic Options:\n"
-    "  -h, --help               Display this help menu and exit\n"
-    "      --version            Display server version information\n"
+    "  -h, --help                            Display this help menu and exit\n"
+    "      --version                         Display server version information\n"
     "\n";
 
 /**
@@ -293,6 +295,10 @@ static void parse_command_line_configuration_options(struct configuration_option
                 }
 
                 /** @todo What happens if we've gotten to this point? */
+            } break;
+
+            case 'f': {
+                configuration_options->configuration_filename = optarg;
             } break;
 
             /**
@@ -531,6 +537,8 @@ static void parse_configuration_file_options(struct configuration_options_t* con
                 configuration_options->hostname = value_string;
             } else if (strcmp(option, "port") == 0) {
                 configuration_options->port = value_string;
+            } else if (strcmp(option, "docroot") == 0) {
+                configuration_options->document_root_directory = value_string;
             } else {
                 free(value_string);
                 fatal_error("[Error] %s: %s\n", "Unrecognized option", option);

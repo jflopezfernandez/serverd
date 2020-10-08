@@ -58,6 +58,8 @@ struct configuration_options_t {
      * 
      */
     const char* port;
+
+    const char* document_root_directory;
 };
 
 /**
