@@ -395,6 +395,56 @@ int main(int argc, char *argv[])
                     /** Log the buffer to stdout for now */
                     printf("%s\n", request);
 
+                    /**
+                     * Stack-allocate a buffer to preserve
+                     * the contents of the original request.
+                     *
+                     */
+                    char original_request[1024] = { 0 };
+
+                    /**
+                     * If the source string is less than n
+                     * bytes long, strncpy(3) pads the destination
+                     * string with NUL bytes to ensure that
+                     * n bytes are always written. It might
+                     * be a good idea to either use a macro
+                     * to specify a size of the minimum
+                     * between n or strlen(request), or just
+                     * not bother zeroing the original_request
+                     * buffer when stack-allocating it.
+                     *
+                     */
+                    strncpy(original_request, request, 1024);
+
+                    /**
+                     * Begin tokenizing the HTTP request
+                     * received from the client.
+                     *
+                     */
+                    char* request_method = strtok(request, " \r\n");
+
+                    if (request_method == NULL) {
+                        /** @todo This error needs to actually be handled. */
+                        fprintf(stderr, "[Error] %s\n", "Invalid method");
+                        return EXIT_FAILURE;
+                    }
+
+                    char* request_uri = strtok(NULL, " \r\n");
+
+                    if (request_uri == NULL) {
+                        /** @todo This also needs to actually be handled */
+                        fprintf(stderr, "[Error] %s\n", "No request URI found.");
+                        return EXIT_FAILURE;
+                    }
+
+                    char* request_version = strtok(NULL, " \r\n");
+
+                    if (request_version == NULL) {
+                        /** @todo Probably send an invalid request error */
+                        fprintf(stderr, "[Error] %s\n", "Invalid request version.");
+                        return EXIT_FAILURE;
+                    }
+
                     const char* response =
                         "HTTP/1.1 200 OK\r\n"
                         "Connection: Close\r\n"
@@ -406,7 +456,19 @@ int main(int argc, char *argv[])
                     sendfile(events[i].data.fd, f, NULL, 311);
                     close(f);
 
-                    // DEBUG: close socket
+                    /**
+                     * At the moment, the server listens for
+                     * incoming connections, accepts them,
+                     * and returns a 200 OK status with the
+                     * default page regardless of the HTTP
+                     * request type or options. For this
+                     * reason, we are simply closing all
+                     * client connections after the initial
+                     * response is sent, while including the
+                     * appropriate 'Connection: Close' HTTP
+                     * header in the response, as well.
+                     *
+                     */
                     int current_socket = events[i].data.fd;
                     epoll_ctl(epfd, EPOLL_CTL_DEL, events[i].data.fd, NULL);
                     close(current_socket);
@@ -415,6 +477,16 @@ int main(int argc, char *argv[])
         }
     }
 
+    /**
+     * Close the server's incoming connection listener
+     * socket.
+     *
+     * At the moment, there is no way to get to this point,
+     * as the server simply continues listening for incoming
+     * connections indefinitely. However, this is included
+     * for good practice, if for no other reason.
+     *
+     */
     close(socket_listen);
 
     return EXIT_SUCCESS;
