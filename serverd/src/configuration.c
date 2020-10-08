@@ -533,11 +533,15 @@ static void parse_configuration_file_options(struct configuration_options_t* con
             strcpy(value_string, value);
 
             /** @todo Validate configuration options */
-            if (strcmp(option, "hostname") == 0) {
+            if (strcmp(option, "User") == 0) {
+                /** @todo Implement run as user */
+            } else if (strcmp(option, "Group") == 0) {
+                /** @todo Implement run as group */
+            } else if (strcmp(option, "Hostname") == 0) {
                 configuration_options->hostname = value_string;
-            } else if (strcmp(option, "port") == 0) {
+            } else if (strcmp(option, "Port") == 0) {
                 configuration_options->port = value_string;
-            } else if (strcmp(option, "docroot") == 0) {
+            } else if (strcmp(option, "DocumentRoot") == 0) {
                 configuration_options->document_root_directory = value_string;
             } else {
                 free(value_string);
