@@ -48,6 +48,7 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
+#include "error.h"
 #include "memory.h"
 
 #if !defined(TRUE) || !defined(FALSE)
@@ -99,6 +100,33 @@ enum { FALSE = 0, TRUE = !FALSE };
  */
 #ifndef DEFAULT_PORT
 #define DEFAULT_PORT "8080"
+#endif
+
+/**
+ * Functions that handle socket initialization, binding, and
+ * other related tasks return an integer that represents a
+ * file descriptor. Since it makes no sense to allow the
+ * same operations on file descriptors as you would on any
+ * arbitrary integers (for instance, what does it mean to
+ * add two file descriptors?), we declare a typedef to more
+ * accurately reflect our intent to represent a socket file
+ * descriptor specifically.
+ *
+ */
+typedef int socket_t;
+
+socket_t socket_(int domain, int type, int protocol) {
+    socket_t new_socket = socket(domain, type, protocol);
+
+    if (new_socket == -1) {
+        fatal_error("[Error] %s\n", strerror(errno));
+    }
+
+    return new_socket;
+}
+
+#ifndef socket
+#define socket socket_
 #endif
 
 /**
@@ -301,13 +329,11 @@ int main(int argc, char *argv[])
     int socket_listen = socket(bind_address->ai_family, bind_address->ai_socktype, bind_address->ai_protocol);
 
     if (socket_listen == -1) {
-        fprintf(stderr, "[Error] %s\n", strerror(errno));
-        return EXIT_FAILURE;
+        fatal_error("[Error] %s\n", strerror(errno));
     }
 
     if (bind(socket_listen, bind_address->ai_addr, bind_address->ai_addrlen) == -1) {
-        fprintf(stderr, "[Error] %s\n", strerror(errno));
-        return EXIT_FAILURE;
+        fatal_error("[Error] %s\n", strerror(errno));
     }
     
     // Free the server address info structure.
@@ -315,15 +341,13 @@ int main(int argc, char *argv[])
 
     /** @todo Set backlog parameter */
     if (listen(socket_listen, 10) == -1) {
-        fprintf(stderr, "[Error] %s\n", strerror(errno));
-        return EXIT_FAILURE;
+        fatal_error("[Error] %s\n", strerror(errno));
     }
 
     int epfd = epoll_create(TRUE);
 
     if (epfd == -1) {
-        fprintf(stderr, "[Error] %s\n", strerror(errno));
-        return EXIT_FAILURE;
+        fatal_error("[Error] %s\n", strerror(errno));
     }
 
     struct epoll_event ev;
@@ -331,8 +355,7 @@ int main(int argc, char *argv[])
     ev.data.fd = socket_listen;
 
     if (epoll_ctl(epfd, EPOLL_CTL_ADD, socket_listen, &ev) == -1) {
-        fprintf(stderr, "[Error] %s\n", strerror(errno));
-        return EXIT_FAILURE;
+        fatal_error("[Error] %s\n", strerror(errno));
     }
 
     struct epoll_event events[EPOLL_MAX_EVENTS];
@@ -341,8 +364,7 @@ int main(int argc, char *argv[])
         int nfds = epoll_wait(epfd, events, EPOLL_MAX_EVENTS, -1);
 
         if (nfds == -1) {
-            fprintf(stderr, "[Error] %s\n", strerror(errno));
-            return EXIT_FAILURE;
+            fatal_error("[Error] %s\n", strerror(errno));
         }
 
         for (int i = 0; i < nfds; ++i) {
@@ -371,8 +393,7 @@ int main(int argc, char *argv[])
 
                 if (get_name_info_error_code) {
                     /** @todo Implement more robust error-handling */
-                    fprintf(stderr, "[Error] %s\n", gai_strerror(get_name_info_error_code));
-                    return EXIT_FAILURE;
+                    fprintf(stderr, "[Error] %s\n", strerror(errno));
                 }
 
                 /** Log the client request to the console */
@@ -388,8 +409,7 @@ int main(int argc, char *argv[])
 
                     if (bytes_received == -1) {
                         /** @todo Actually handle this error */
-                        fprintf(stderr, "[Error] %s\n", strerror(errno));
-                        return EXIT_FAILURE;
+                        fatal_error("[Error] %s\n", strerror(errno));
                     }
 
                     /** Log the buffer to stdout for now */
@@ -425,24 +445,21 @@ int main(int argc, char *argv[])
 
                     if (request_method == NULL) {
                         /** @todo This error needs to actually be handled. */
-                        fprintf(stderr, "[Error] %s\n", "Invalid method");
-                        return EXIT_FAILURE;
+                        fatal_error(stderr, "[Error] %s\n", "Invalid request method.");
                     }
 
                     char* request_uri = strtok(NULL, " \r\n");
 
                     if (request_uri == NULL) {
                         /** @todo This also needs to actually be handled */
-                        fprintf(stderr, "[Error] %s\n", "No request URI found.");
-                        return EXIT_FAILURE;
+                        fatal_error(stderr, "[Error] %s\n", "No request URI found.");
                     }
 
                     char* request_version = strtok(NULL, " \r\n");
 
                     if (request_version == NULL) {
                         /** @todo Probably send an invalid request error */
-                        fprintf(stderr, "[Error] %s\n", "Invalid request version.");
-                        return EXIT_FAILURE;
+                        fatal_error(stderr, "[Error] %s\n", "Invalid request version.");
                     }
 
                     const char* response =
