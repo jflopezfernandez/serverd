@@ -48,60 +48,10 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
-#include "config.h"
+#include "serverd.h"
+#include "configuration.h"
 #include "error.h"
 #include "memory.h"
-
-#if !defined(TRUE) || !defined(FALSE)
-/**
- * @brief Definitions for true and false
- *
- * @details This enum contains definitions for the boolean
- * values TRUE and FALSE, which represent 1 and 0,
- * respectively.
- * 
- */
-enum { FALSE = 0, TRUE = !FALSE };
-#endif
-
-/**
- * @def EPOLL_MAX_EVENTS
- * @brief Maximum events returned per call to epoll_wait(2).
- * 
- */
-#ifndef EPOLL_MAX_EVENTS
-#define EPOLL_MAX_EVENTS (10)
-#endif
-
-/**
- * @def DEFAULT_HOSTNAME
- * @brief The server's default hostname.
- * 
- */
-#ifndef DEFAULT_HOSTNAME
-#define DEFAULT_HOSTNAME "localhost"
-#endif
-
-/**
- * @def DEFAULT_PORT
- * @brief The default port the server should listen on.
- *
- * @details Superuser privileges are required in order for
- * any application to bind to a port with a number in the
- * range 1-1024. Common port numbers for development or
- * testing web servers to use are 3000 and 8080. If started
- * on port 80, the server will respond to and service client
- * requests like any normal server would, although it is
- * also possible to use a reverse proxy for TLS termination
- * while native serverd TLS support is implemented.
- *
- * @author Jose Fernando Lopez Fernandez
- * @date October 7, 2020 [08:13:05 AM EDT]
- * 
- */
-#ifndef DEFAULT_PORT
-#define DEFAULT_PORT "8080"
-#endif
 
 /**
  * Functions that handle socket initialization, binding, and
@@ -127,56 +77,66 @@ socket_t socket_(int domain, int type, int protocol) {
 }
 
 #ifndef socket
-#define socket socket_
+    #define socket socket_
+#else
+    #error "socket() macro already defined"
 #endif
 
-/**
- * Program Options
- *
- * @details This array contains the list of valid long
- * options recognized by the server, as well as whether each
- * option accepts (or sometimes even requires) an additional
- * value when specified. If the third argument is NULL, the
- * call to getopt_long returns the fourth argument.
- * Otherwise, the call to getopt_long will return the value
- * specified by that fourth argument.
- * 
- */
-static struct option long_options[] = {
-    { "help",     no_argument,       0, 'h' },
-    { "version",  no_argument,       0,  0  },
-    { "hostname", required_argument, 0, 'H' },
-    { "port",     required_argument, 0, 'p' },
-    { 0, 0, 0, 0 }
-};
+void bind_(socket_t socket, const struct sockaddr* socket_address, socklen_t address_length) {
+    int result = bind(socket, socket_address, address_length);
 
-/**
- * Program Help Menu
- *
- * @details This is the menu display to the user when the -h
- * or --help command-line arguments are passed in. The
- * option list is current as of October 7, 2020 [11:13 AM EDT],
- * but the project version information still needs to be
- * sorted out.
- *
- * @author Jose Fernando Lopez Fernandez
- * @date October 7, 2020 [11:13:52 AM EDT]
- *
- * @todo Establish project versioning system
- *
- */
-static const char* help_menu = 
-    "serverd version: 0.0.1\n"
-    "Usage: serverd [options]\n"
-    "\n"
-    "Configuration Options:\n"
-    "  -H, --hostname <str>     Server hostname\n"
-    "  -p, --port <int>         Port number to bind to\n"
-    "\n"
-    "Generic Options:\n"
-    "  -h, --help               Display this help menu and exit\n"
-    "      --version            Display server version information\n"
-    "\n";
+    if (result == -1) {
+        fatal_error("[Error] %s\n", strerror(errno));
+    }
+}
+
+#ifndef bind
+    #define bind bind_
+#else
+    #error "bind() macro already defined"
+#endif
+
+void listen_(socket_t socket, size_t backlog) {
+    /**
+     * If the number of conections to backlog is larger than
+     * the value in /proc/sys/net/core/somaxconn, then it is
+     * silently truncated to that value.
+     *
+     * The default value is 4096.
+     *
+     */
+    if (listen(socket, backlog) == -1) {
+        fatal_error("[Error] %s\n", strerror(errno));
+    }
+}
+
+#ifndef listen
+    #define listen listen_
+#else
+    #error "listen() macro already defined"
+#endif
+
+socket_t initialize_listener_socket(const char* hostname, const char* port) {
+    struct addrinfo hints;
+    memset(&hints, 0, sizeof (hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_PASSIVE;
+
+    struct addrinfo* bind_address;
+    getaddrinfo(hostname, port, &hints, &bind_address);
+    
+    socket_t listener_socket = socket(bind_address->ai_family, bind_address->ai_socktype, bind_address->ai_protocol);
+    bind(listener_socket, bind_address->ai_addr, bind_address->ai_addrlen);
+    
+    // Free the server address info structure.
+    freeaddrinfo(bind_address);
+
+    /** @todo Set backlog parameter */
+    listen(listener_socket, SOMAXCONN);
+
+    return listener_socket;
+}
 
 /**
  * This is the entry point of the server.
@@ -189,161 +149,23 @@ static const char* help_menu =
 int main(int argc, char *argv[])
 {
     /**
-     * @brief The hostname the server will use.
+     * Initialize the configuration options container.
      *
-     * @todo The user should be able to configure the
-     * hostname for the server on a per-virtual host basis.
-     * 
-     */
-    const char* hostname = DEFAULT_HOSTNAME;
-
-    /**
-     * @brief The port the server will use to listen for incoming
-     * client connections on.
-     * 
-     */
-    const char* port = DEFAULT_PORT;
-
-    /**
-     * Enter command-line argument processing loop.
-     *
-     * The option string dictates what short options are
-     * valid when starting the server with command-line
-     * arguments. Some of these short options interact with
-     * the long options array defined above.
-     *
-     * An option that must be specified with an argument has
-     * a colon after its letter. If the argument for a
-     * particular option is optional, that option's letter
-     * will be followed by two colons.
+     * The configuration module handles all of the command-
+     * line and configuration file parsing, so once we call
+     * this function, the server is ready to rock and roll.
      *
      */
-    while (TRUE) {
+    struct configuration_options_t* configuration_options = initialize_server_configuration(argc, argv);
 
-        /**
-         * @details This variable is set by getopt_long(3)
-         * on each iteration of the option-parsing loop. It
-         * is used as the index to the long options array
-         * when a long option is detected in the input.
-         *
-         */
-        int option_index = 0;
+    printf("Configured hostname: %s\n", configuration_options->hostname);
+    printf("Configured server port: %s\n", configuration_options->port);
 
-        /**
-         * Option Char
-         *
-         * @details Each call to getopt_long(3) returns a
-         * sentinel character that either uniquely identifies
-         * a command-line option or can be used to do so in
-         * the case where the return value is zero (0).
-         *
-         * This latter case is useful because it allows for
-         * the use of both long and short option forms, both
-         * of which this server uses.
-         *
-         */
-        int c = getopt_long(argc, argv, "hvH:p:", long_options, &option_index);
-
-        /**
-         * When getopt(3), et. al, are done parsing all of
-         * the passed-in command-line arguments, they return
-         * a value of -1. We can therefore simply and safely
-         * break out of this loop if we detect this here.
-         *
-         */
-        if (c == -1) {
-            /**
-             * Any additional command-line arguments that
-             * were not deemed to be valid command-line
-             * options are considered to be positional
-             * arguments, and they can be iterated over
-             * using the optind variable provided by the
-             * getopt*(3) function(s).
-             *
-             * All of these positional arguments, if they
-             * exist, will be located at argv[optind] until
-             * argv[argc - 1].
-             *
-             */
-            break;
-        }
-
-        switch (c) {
-            case 0: {
-                if (strcmp(long_options[option_index].name, "version") == 0) {
-                    /** @todo Configure project versioning info */
-                    printf("Version Info\n");
-                    return EXIT_SUCCESS;
-                }
-
-                /** @todo What happens if we've gotten to this point? */
-            } break;
-
-            /**
-             * Configure Server Hostname
-             */
-            case 'H': {
-                hostname = optarg;
-            } break;
-
-            /**
-             * Display Help Menu
-             */
-            case 'h': {
-                printf("%s", help_menu);
-                return EXIT_SUCCESS;
-            } break;
-
-            /**
-             * Configure Server Port
-             */
-            case 'p': {
-                port = optarg;
-            } break;
-
-            /** @todo What conditions cause this case, and how likely are they? */
-            case '?': {
-                break;
-            } break;
-
-            /** @todo What conditions trigger this case, and how likely are they? */
-            default: {
-                printf("?? getopt returned character code 0%o ?? \n", c);
-            } break;
-        }
-    }
-
-    printf("Configured hostname: %s\n", hostname);
-    printf("Configured server port: %s\n", port);
+    return EXIT_SUCCESS;
     
     printf("%s\n", "serverd starting...");
 
-    struct addrinfo hints;
-    memset(&hints, 0, sizeof (hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_PASSIVE;
-
-    struct addrinfo* bind_address;
-    getaddrinfo(NULL, port, &hints, &bind_address);
-    
-    int socket_listen = socket(bind_address->ai_family, bind_address->ai_socktype, bind_address->ai_protocol);
-
-    if (socket_listen == -1) {
-        fatal_error("[Error] %s\n", strerror(errno));
-    }
-
-    if (bind(socket_listen, bind_address->ai_addr, bind_address->ai_addrlen) == -1) {
-        fatal_error("[Error] %s\n", strerror(errno));
-    }
-    
-    // Free the server address info structure.
-    freeaddrinfo(bind_address);
-
-    /** @todo Set backlog parameter */
-    if (listen(socket_listen, 10) == -1) {
-        fatal_error("[Error] %s\n", strerror(errno));
-    }
+    socket_t socket_listen = initialize_listener_socket(configuration_options->hostname, configuration_options->port);
 
     int epfd = epoll_create(TRUE);
 
