@@ -31,6 +31,19 @@
 #include "serverd.h"
 #include "configuration.h"
 #include "error.h"
+#include "memory.h"
+
+/**
+ * @def DEFAULT_CONFIGURATION_FILENAME
+ * @brief The default configuration filename for the server.
+ *
+ * @details This filename and path corresponds to the sample
+ * configuration file included in the server source directory.
+ *
+ */
+#ifndef DEFAULT_CONFIGURATION_FILENAME
+#define DEFAULT_CONFIGURATION_FILENAME "samples/conf/serverd.conf"
+#endif
 
 /**
  * @def DEFAULT_HOSTNAME
@@ -116,19 +129,26 @@ static const char* help_menu =
  * This function ensures that the memory allocation succeeded,
  * calling exit(3) if malloc returns NULL.
  *
- * @todo Use the memory module to introduce indirection, so
- * that we can replace the malloc implementation much more
- * simply, should that be beneficial down the road.
- *
  */
 static struct configuration_options_t* allocate_configuration_options_object(void) {
-    struct configuration_options_t* configuration_options = malloc(sizeof (struct configuration_options_t));
-
-    if (configuration_options == NULL) {
-        fatal_error("[Error] %s: %s", "Failed to allocate configuration options object", strerror(errno));
-    }
-
-    return configuration_options;
+    /**
+     * Allocate the memory block for the configuration
+     * options object and immediately return it.
+     *
+     * Due to some nifty refactoring, this function is
+     * simply a convenience method to make the allocation of
+     * the configuration options object invisible to the
+     * calling function within the module.
+     *
+     * Previously, this function contained error-checking
+     * code designed to verify that the call to malloc
+     * succeeded. This code is no longer necessary, as the
+     * allocate_memory function is the public interface to
+     * the memory module, which now handles all of that
+     * error-checking and bookkeeping behind the scenes.
+     *
+     */
+    return allocate_memory(sizeof (struct configuration_options_t));
 }
 
 /**
@@ -151,6 +171,18 @@ static struct configuration_options_t* initialize_default_configuration(void) {
      *
      */
     struct configuration_options_t* configuration_options = allocate_configuration_options_object();
+
+    /**
+     * The server configuration file name.
+     *
+     * A different configuration filename can be passed in
+     * via the command-line, and users can also request the
+     * server bypass all configuration file parsing and
+     * use simply configuration directives passed in via the
+     * command-line options.
+     *
+     */
+    configuration_options->configuration_filename = DEFAULT_CONFIGURATION_FILENAME;
 
     /**
      * @brief The hostname the server will use.
@@ -292,10 +324,65 @@ static void parse_command_line_configuration_options(struct configuration_option
 
             /** @todo What conditions trigger this case, and how likely are they? */
             default: {
-                printf("?? getopt returned character code 0%o ?? \n", c);
+                fatal_error("?? getopt returned character code 0%o ?? \n", c);
             } break;
         }
     }
+}
+
+/**
+ * Parse server configuration file
+ *
+ * This function handles the setting of server configuration
+ * options by parsing the configuration file specified
+ * either via the command-line or using the default value
+ * set in the DEFAULT_CONFIGURATION_FILENAME directive.
+ *
+ * @note The function allows for the bypassing of config
+ * file parsing altogether by specifying a value of NULL for
+ * the configuration_filename parameter.
+ *
+ */
+__attribute__((nonnull(1)))
+static void parse_configuration_file_options(struct configuration_options_t* configuration_options) {
+    /**
+     * If we have configuration filename argument, we simply
+     * short-circuit execution (and prevent a segmentation
+     * fault) by simply returning right away.
+     *
+     */
+    if (configuration_options->configuration_filename == NULL) {
+        /**
+         * There is no value to return, as this function has
+         * a return type of void, so an empty return statement
+         * is good enough.
+         *
+         */
+        return;
+    }
+
+    FILE* configuration_file = fopen(configuration_options->configuration_filename, "r");
+
+    if (configuration_file == NULL) {
+        fatal_error("[Error] %s: %s (%s)\n", "Could not open configuration file", configuration_options->configuration_filename, strerror(errno));
+    }
+
+    /** @todo Continue configuration file parsing */
+
+    size_t buffer_size = 512;
+    char* line_buffer = allocate_memory(sizeof(char) * buffer_size);
+
+    while ((getline(&line_buffer, &buffer_size, configuration_file)) > 0) {
+        printf("%s", line_buffer);
+    }
+
+    // int current_character = 0;
+
+    // while ((current_character = fgetc(configuration_file)) != EOF) {
+    //     putchar(current_character);
+    // }
+
+    fclose(configuration_file);
 }
 
 /**
@@ -325,6 +412,17 @@ struct configuration_options_t* initialize_server_configuration(int argc, char *
      *
      */
     parse_command_line_configuration_options(configuration_options, argc, argv);
+
+    /**
+     * Parse server configuration file.
+     *
+     * Once the previous step of parsing the command-line
+     * for user options has been completed, we continue by
+     * reading the configuration file to continue the
+     * configuration process.
+     *
+     */
+    parse_configuration_file_options(configuration_options);
 
     /**
      * Return the configured server options.

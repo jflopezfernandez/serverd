@@ -30,6 +30,18 @@
  *
  */
 struct configuration_options_t {
+
+    /**
+     * The server configuration file name.
+     *
+     * A different configuration filename can be passed in
+     * via the command-line, and users can also request the
+     * server bypass all configuration file parsing and
+     * use simply configuration directives passed in via the
+     * command-line options.
+     *
+     */
+    const char* configuration_filename;
     
     /**
      * The hostname for the server.
