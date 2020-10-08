@@ -23,6 +23,13 @@ $(TARGET): $(OBJS)
 %.o: %.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $^
 
+.PHONY: docs
+docs: html
+
+.PHONY: html
+html: docs/Doxyfile
+	doxygen $^
+
 .PHONY: clean
 clean:
 	$(RM) $(OBJS) $(TARGET)
