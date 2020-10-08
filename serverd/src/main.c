@@ -367,7 +367,15 @@ int main(int argc, char *argv[])
                 }
 
                 char address_buffer[128];
-                getnameinfo((struct sockaddr *) &client_address, client_len, address_buffer, sizeof (address_buffer), NULL, 0, NI_NUMERICHOST);
+                int get_name_info_error_code = getnameinfo((struct sockaddr *) &client_address, client_len, address_buffer, sizeof (address_buffer), NULL, 0, NI_NUMERICHOST);
+
+                if (get_name_info_error_code) {
+                    /** @todo Implement more robust error-handling */
+                    fprintf(stderr, "[Error] %s\n", gai_strerror(get_name_info_error_code));
+                    return EXIT_FAILURE;
+                }
+
+                /** Log the client request to the console */
                 printf("New connection from %s\n", address_buffer);
             } else {
                 if (events[i].events & EPOLLIN) {
@@ -376,7 +384,13 @@ int main(int argc, char *argv[])
                     char request[1024] = { 0 };
 
                     /** Read the client request into the buffer */
-                    read(events[i].data.fd, request, 1024);
+                    ssize_t bytes_received = read(events[i].data.fd, request, 1024);
+
+                    if (bytes_received == -1) {
+                        /** @todo Actually handle this error */
+                        fprintf(stderr, "[Error] %s\n", strerror(errno));
+                        return EXIT_FAILURE;
+                    }
 
                     /** Log the buffer to stdout for now */
                     printf("%s\n", request);
