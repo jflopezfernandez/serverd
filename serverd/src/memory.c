@@ -22,8 +22,85 @@
  */
 
 #include <stdlib.h>
+#include <string.h>
+#include <errno.h>
 
+/**
+ * Allow for the use of the jemalloc memory allocator instead
+ * of the standard library malloc.
+ *
+ */
+#if defined(ENABLE_JEMALLOC)
+#include <jemalloc/jemalloc.h>
+#endif
+
+#include "serverd.h"
+#include "error.h"
 #include "memory.h"
+
+/**
+ * Allocate number of bytes specified by size argument.
+ *
+ * This function represents the public interface to the
+ * serverd memory module. This function replaces all external
+ * calls to malloc(3).
+ *
+ * This interface allows all error-checking to take place
+ * internally, removing the burden from the caller. In
+ * addition, this interface allows for the transparent
+ * replacement of the memory allocator apparatus without
+ * requiring any additional external refactoring.
+ *
+ */
+void* allocate_memory(size_t size) {
+    /**
+     * Allocate the memory block of requested size.
+     *
+     * @note If jemalloc is enabled, this call to malloc is
+     * transparently replaced to a call to je_malloc via a
+     * preprocessor macro definition. This can be disabled
+     * by defining JEMALLOC_NO_RENAME, but the default is
+     * probably both simpler and preferable.
+     *
+     */
+    void* memory_block = malloc(size);
+
+    /**
+     * Ensure that pointer returned by the call to malloc
+     * points to a valid memory block segment.
+     *
+     * Both the C standard library and jemalloc memory
+     * allocation function returns a NULL pointer if there
+     * is a problem allocating the requested memory. This
+     * check is therefore necessary regardless of the malloc
+     * implementation we are using.
+     *
+     */
+    if (memory_block == NULL) {
+        /**
+         * If the returned memory block is invalid, there
+         * was a significant problem.
+         *
+         * At the moment, we are not going to do any complex
+         * error handling; we are simply going to terminate
+         * the process with an error status and go from
+         * there.
+         *
+         */
+        fatal_error("[Error] %s: %s\n", "Memory allocation failure in call to malloc()", strerror(errno));
+    }
+
+    /**
+     * Return the newly-allocated memory block.
+     *
+     * Since we have already performed the requisite
+     * validation, client code no longer needs to perform
+     * this check, eliminating the need for that annoying
+     * boilerplate, and thereby reducing code size.
+     *
+     */
+    return memory_block;
+}
 
 /**
  * Prevent double-free errors

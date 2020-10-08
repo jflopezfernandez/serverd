@@ -25,6 +25,23 @@
 #define PROJECT_INCLUDES_MEMORY_H
 
 /**
+ * Allocate number of bytes specified by size argument.
+ *
+ * This function represents the public interface to the
+ * serverd memory module. This function replaces all external
+ * calls to malloc(3).
+ *
+ * This interface allows all error-checking to take place
+ * internally, removing the burden from the caller. In
+ * addition, this interface allows for the transparent
+ * replacement of the memory allocator apparatus without
+ * requiring any additional external refactoring.
+ *
+ */
+__attribute__((malloc,returns_nonnull))
+void* allocate_memory(size_t size);
+
+/**
  * Prevent double-free errors
  *
  * @details This function works by taking a pointer argument
@@ -37,6 +54,7 @@
  * the next *ptr is not equal to NULL;
  *
  */
+__attribute__((nonnull(1)))
 void safe_free(void** ptr);
 
 /**
