@@ -43,6 +43,9 @@
 *.hex
 serverd/serverd
 
+# Valgrind Output
+vgcore*
+
 # Debug files
 *.dSYM/
 *.su
