@@ -161,18 +161,46 @@ int main(int argc, char *argv[])
      */
     struct configuration_options_t* configuration_options = initialize_server_configuration(argc, argv);
 
-    umask(0);
-    struct rlimit resource_limit;
-    getrlimit(RLIMIT_NOFILE, &resource_limit);
+    /**
+     * Call umask to set the file mode creation mask to a
+     * known mode.
+     *
+     */
+    umask(007);
 
+    /**
+     * In order for the server process to daemonize, we need
+     * to first call fork.
+     *
+     */
     pid_t pid;
 
     if ((pid = fork()) == -1) {
+        /**
+         * If something went wrong during the call to fork(2),
+         * log, this represents a fatal error and we cannot
+         * proceed with the server initialization procedure.
+         *
+         */
         fatal_error("[Error] %s\n", strerror(errno));
     } else if (pid != 0) {
+        /**
+         * If nothing went wrong with the call to fork(2),
+         * the parent thread we started from the shell will
+         * exit. The child process will continue with no
+         * controlling terminal.
+         *
+         */
         return EXIT_SUCCESS;
     }
 
+    /**
+     * Having previously called fork(2) and terminated the
+     * parent process, the current process is not a process
+     * group leader, and therefore the call to setsid(2)
+     * creates a new session.
+     *
+     */
     setsid();
 
     struct sigaction signal_action;
@@ -184,17 +212,20 @@ int main(int argc, char *argv[])
         fatal_error("[Error] %s\n", strerror(errno));
     }
 
-    if ((pid = fork()) == -1) {
-        fatal_error("[Error] %s\n", strerror(errno));
-    } else if (pid != 0) {
-        return EXIT_SUCCESS;
-    }
+    // if ((pid = fork()) == -1) {
+    //     fatal_error("[Error] %s\n", strerror(errno));
+    // } else if (pid != 0) {
+    //     return EXIT_SUCCESS;
+    // }
 
     printf("%u\n", getpid());
 
     // if (chdir("/") == -1) {
     //    fatal_error("[Error] %s\n", strerror(errno));
     // }
+
+    struct rlimit resource_limit;
+    getrlimit(RLIMIT_NOFILE, &resource_limit);
 
     if (resource_limit.rlim_max == RLIM_INFINITY) {
         resource_limit.rlim_max = 1024;
@@ -349,7 +380,26 @@ int main(int argc, char *argv[])
                     send(events[i].data.fd, response, strlen(response), 0);
                     //int f = open(filename_buffer, O_RDONLY | O_NONBLOCK);
                     int f = open("samples/site/index.html", O_RDONLY | O_NONBLOCK);
-                    sendfile(events[i].data.fd, f, NULL, 311);
+
+                    if (f == -1) {
+                        syslog(LOG_ERR, "[Error] Could not open file: index.html %s", strerror(errno));
+                        return EXIT_FAILURE;
+                    }
+
+                    struct stat status;
+
+                    if (fstat(f, &status) == -1) {
+                        syslog(LOG_ERR, "%s: %s", "Could not check file status", strerror(errno));
+                        return EXIT_FAILURE;
+                    }
+
+                    ssize_t bytes_sent = sendfile(events[i].data.fd, f, NULL, status.st_size);
+
+                    if (bytes_sent == -1) {
+                        syslog(LOG_ERR, "[Error] sendfile(2) failed: %s", strerror(errno));
+                        return EXIT_FAILURE;
+                    }
+
                     close(f);
 
                     /**

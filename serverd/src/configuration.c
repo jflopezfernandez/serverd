@@ -538,7 +538,11 @@ static void parse_configuration_file_options(struct configuration_options_t* con
             } else if (strcmp(option, "Group") == 0) {
                 /** @todo Implement run as group */
             } else if (strcmp(option, "Hostname") == 0) {
-                configuration_options->hostname = value_string;
+                if (strcmp(value_string, "0") == 0) {
+                    configuration_options->hostname = NULL;
+                } else {
+                    configuration_options->hostname = value_string;
+                }
             } else if (strcmp(option, "Port") == 0) {
                 configuration_options->port = value_string;
             } else if (strcmp(option, "DocumentRoot") == 0) {
