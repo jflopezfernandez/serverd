@@ -30,6 +30,19 @@ docs: html
 html: docs/Doxyfile
 	doxygen $^
 
+.PHONY: install
+install: $(TARGET)
+	install --owner=root --group=root --mode=u+rwx,g+rx,g-w,o+rx,o-w -T ./serverd /usr/local/bin/serverd
+	[ -d /etc/serverd ] || mkdir -p /etc/serverd/
+	install --owner=root --group=root --mode=u+rw,u-x,g+r,g-wx,o+r,o-wx -T ./samples/conf/serverd.conf /etc/serverd/serverd.conf
+	[ -d /srv/http ] && install --owner=jflopezfernandez --group=http --mode=u+rw,u-x,g+r,g-wx,o+r,o-wx -T ./samples/site/index.html /srv/http/index.html
+
+.PHONY: uninstall
+uninstall:
+	[ -e /usr/local/bin/serverd ] && rm -f /usr/local/bin/serverd || true
+	[ -d /etc/serverd/ ] && rm -rf /etc/serverd/ || true
+	[ -e /srv/http/index.html ] && rm -f /srv/http/index.html || true
+
 .PHONY: clean
 clean:
 	$(RM) $(OBJS) $(TARGET)

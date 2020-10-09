@@ -372,17 +372,21 @@ int main(int argc, char *argv[])
                         "Content-Type: text/html\r\n"
                         "\r\n";
                     
-                    //char filename_buffer[1024] = { 0 };
-                    //snprintf(filename_buffer, 1024, "%s%s", configuration_options->document_root_directory, "index.html");
-                    //syslog(LOG_DEBUG, "Filename buffer: %s", filename_buffer);
+                    char filename_buffer[1024] = { 0 };
+                    snprintf(filename_buffer, 1024, "%s%s", configuration_options->document_root_directory, "index.html");
+                    syslog(LOG_DEBUG, "Filename buffer: %s", filename_buffer);
 
 
                     send(events[i].data.fd, response, strlen(response), 0);
                     //int f = open(filename_buffer, O_RDONLY | O_NONBLOCK);
-                    int f = open("samples/site/index.html", O_RDONLY | O_NONBLOCK);
+                    //int f = open("samples/site/index.html", O_RDONLY | O_NONBLOCK);
+
+                    //const char* filename = "/home/jflopezfernandez/projects/c/serverd/serverd/samples/site/index.html";
+
+                    int f = open(filename_buffer, O_RDONLY | O_NONBLOCK);
 
                     if (f == -1) {
-                        syslog(LOG_ERR, "[Error] Could not open file: index.html %s", strerror(errno));
+                        syslog(LOG_ERR, "[Error] Could not open file: %s (%s)", filename_buffer, strerror(errno));
                         return EXIT_FAILURE;
                     }
 
