@@ -142,6 +142,117 @@ socket_t initialize_listener_socket(const char* hostname, const char* port) {
 }
 
 /**
+ * HTTP request methods as specified in RFC 7231
+ *
+ * See: https://tools.ietf.org/html/rfc7231#section-4
+ *
+ */
+enum request_method_t {
+    REQUEST_METHOD_UNKNOWN,
+    REQUEST_METHOD_GET,
+    REQUEST_METHOD_POST,
+    REQUEST_METHOD_HEAD,
+    REQUEST_METHOD_PUT,
+    REQUEST_METHOD_DELETE,
+    REQUEST_METHOD_CONNECT,
+    REQUEST_METHOD_OPTIONS,
+    REQUEST_METHOD_TRACE
+};
+
+struct http_request_t {
+    enum request_method_t request_method;
+    const char* request_uri;
+};
+
+enum http_status_code_t {
+    HTTP_STATUS_CODE_NULL = 0,
+    HTTP_STATUS_CODE_CONTINUE = 100,
+    HTTP_STATUS_CODE_SWITCHING_PROTOCOL = 101,
+    HTTP_STATUS_CODE_PROCESSING = 102,
+    HTTP_STATUS_CODE_EARLY_HINTS = 103.
+    HTTP_STATUS_CODE_OK = 200,
+    HTTP_STATUS_CODE_CREATED = 201,
+    HTTP_STATUS_CODE_ACCEPTED = 202,
+    HTTP_STATUS_CODE_NON_AUTHORITATIVE_INFORMATION = 203,
+    HTTP_STATUS_CODE_NO_CONTENT = 204,
+    HTTP_STATUS_CODE_RESET_CONTENT = 205,
+    HTTP_STATUS_CODE_PARTIAL_CONTENT = 206,
+    HTTP_STATUS_CODE_MULTIPLE_CHOICE = 300,
+    HTTP_STATUS_CODE_MOVED_PERMANENTLY = 301,
+    HTTP_STATUS_CODE_FOUND = 302,
+    HTTP_STATUS_CODE_NOT_MODIFIED = 304,
+    HTTP_STATUS_CODE_TEMPORARY_REDIRECT = 307,
+    HTTP_STATUS_CODE_PERMANENT_REDIRECT = 308,
+    HTTP_STATUS_CODE_BAD_REQUEST = 400,
+    HTTP_STATUS_CODE_UNAUTHORIZED = 401,
+    HTTP_STATUS_CODE_FORBIDDEN = 403,
+    HTTP_STATUS_CODE_NOT_FOUND = 404,
+    HTTP_STATUS_CODE_METHOD_NOT_ALLOWED = 405,
+    HTTP_STATUS_CODE_NOT_ACCEPTABLE = 406,
+    HTTP_STATUS_CODE_PROXY_AUTHENTICATION_REQUIRED = 407,
+    HTTP_STATUS_CODE_REQUEST_TIMEOUT = 408,
+    HTTP_STATUS_CODE_CONFLICT = 409,
+    HTTP_STATUS_CODE_GONE = 410,
+    HTTP_STATUS_CODE_LENGTH_REQUIRED = 411,
+    HTTP_STATUS_CODE_PRECONDITION_FAILED = 412,
+    HTTP_STATUS_CODE_PAYLOAD_TOO_LARGE = 413,
+    HTTP_STATUS_CODE_URI_TOO_LONG = 414,
+    HTTP_STATUS_CODE_UNSUPPORTED_MEDIA_TYPE = 415,
+    HTTP_STATUS_CODE_EXPECTATION_FAILED = 417,
+    HTTP_STATUS_CODE_IM_A_LITTLE_TEAPOT = 418,
+    HTTP_STATUS_CODE_UPGRADE_REQUIRED = 426,
+    HTTP_STATUS_CODE_PRECONDITION_REQUIRED = 428,
+    HTTP_STATUS_CODE_TOO_MANY_REQUESTS = 429,
+    HTTP_STATUS_CODE_REQUEST_HEADER_FIELDS_TOO_LARGE = 431,
+    HTTP_STATUS_CODE_UNAVAILABLE_FOR_LEGAL_REASONS = 451,
+    HTTP_STATUS_CODE_INTERNAL_SERVER_ERROR = 500,
+    HTTP_STATUS_CODE_NOT_IMPLEMENTED = 501,
+    HTTP_STATUS_CODE_BAD_GATEWAY = 502,
+    HTTP_STATUS_CODE_SERVICE_UNAVAILABLE = 503,
+    HTTP_STATUS_CODE_GATEWAY_TIMEOUT = 504,
+    HTTP_STATUS_CODE_HTTP_VERSION_NOT_SUPPORTED = 505,
+    HTTP_STATUS_CODE_VARIANT_ALSO_NEGOTIATES = 506,
+    HTTP_STATUS_CODE_NOT_EXTENDED = 510,
+    HTTP_STATUS_CODE_NETWORK_AUTHENTICATION_REQUIRED = 511
+};
+
+struct uri_t {
+    char* protocol;
+    char* hostname;
+    char* port_num;
+    char* doc_path;
+};
+
+struct uri_t* parse_uri(char* uri_string) {
+    char* uri_buffer = malloc(strlen(uri_string));
+    strcpy(uri_buffer, uri_string);
+
+    struct uri_t* uri = malloc(sizeof(struct uri_t));
+
+    char* p = strstr(uri_buffer, "://");
+    
+
+    return uri;
+}
+
+void free_uri(struct uri_t* uri) {
+    free(uri->protocol);
+    free(uri->hostname);
+    free(uri->port_num);
+    free(uri->doc_path);
+    free(uri);
+}
+
+void print_uri(struct uri_t* uri) {
+    printf("URL: %s://%s%s%s\n", uri->protocol, uri->hostname, uri->portnum, uri->doc_path);
+    printf("  - Protocol: %s\n", uri->protocol);
+    printf("  - Hostname: %s\n", uri->hostname);
+    printf("  - Port Num: %s\n", uri->port_num);
+    printf("  - Doc Path: %s\n", uri->doc_path);
+    printf("\n");
+}
+
+/**
  * This is the entry point of the server.
  * 
  * @param argc 
@@ -151,6 +262,20 @@ socket_t initialize_listener_socket(const char* hostname, const char* port) {
  */
 int main(int argc, char *argv[])
 {
+    if (argc == 1) {
+        fprintf(stderr, "No input(s).\n");
+        return EXIT_FAILURE;
+    }
+
+    while (*++argv) {
+        printf("%s\n", *argv);
+        struct uri_t* uri = parse_uri(*argv);
+        print_uri(uri);
+        free_uri(uri);
+    }
+
+    return EXIT_SUCCESS;
+
     /**
      * Initialize the configuration options container.
      *

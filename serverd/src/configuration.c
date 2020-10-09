@@ -42,7 +42,7 @@
  *
  */
 #ifndef DEFAULT_CONFIGURATION_FILENAME
-#define DEFAULT_CONFIGURATION_FILENAME "samples/conf/serverd.conf"
+#define DEFAULT_CONFIGURATION_FILENAME "/etc/serverd/serverd.conf"
 #endif
 
 /**
